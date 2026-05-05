@@ -1048,16 +1048,12 @@ button:disabled {
   height: 132px;
   border-radius: 28px;
   opacity: 0.28;
-  background:
-    linear-gradient(135deg, transparent 18%, rgba(255,255,255,0.28) 18% 21%, transparent 21%),
-    radial-gradient(circle, var(--accent) 0 34%, transparent 35%);
+  background: radial-gradient(circle, var(--accent) 0 34%, transparent 35%);
   transform: rotate(22deg);
 }
 
 .app-shell .tool-tabs button:nth-child(2)::after {
-  background:
-    linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.24) 18% 21%, transparent 21%),
-    radial-gradient(circle, var(--accent-2) 0 34%, transparent 35%);
+  background: radial-gradient(circle, var(--accent-2) 0 34%, transparent 35%);
 }
 
 .app-shell .tool-tabs button svg {
