@@ -1,10 +1,12 @@
+import fs from "node:fs/promises";
 import { Router } from "express";
 import { z } from "zod";
+import { pool } from "../db/pool.js";
 import { query } from "../db/pool.js";
 import { enqueueBaseGeneration, enqueueUnfoldGeneration } from "../jobs/processor.js";
 import { requireAuth } from "../middleware/auth.js";
 import { upload } from "../storage/upload.js";
-import { publicPathForStoragePath } from "../storage/paths.js";
+import { absoluteStoragePath, publicPathForStoragePath } from "../storage/paths.js";
 import { asyncHandler } from "../utils/http.js";
 
 const router = Router();
@@ -228,6 +230,58 @@ router.get("/:id", asyncHandler(async (req, res) => {
   const payload = await generationPayload(req.params.id, req.user.id);
   if (!payload) return res.status(404).json({ error: "Generation not found" });
   res.json(payload);
+}));
+
+router.delete("/:id", asyncHandler(async (req, res) => {
+  const client = await pool.connect();
+  let storagePaths = [];
+
+  try {
+    await client.query("BEGIN");
+
+    const generation = await client.query(
+      "SELECT * FROM generations WHERE id = $1 AND user_id = $2 FOR UPDATE",
+      [req.params.id, req.user.id]
+    );
+    if (!generation.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Generation not found" });
+    }
+    if (generation.rows[0].status === "processing") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Cannot delete a generation while it is processing" });
+    }
+
+    const assetResult = await client.query(
+      `SELECT DISTINCT a.id, a.storage_path
+       FROM assets a
+       WHERE a.id = $1
+          OR a.id IN (
+            SELECT asset_id FROM generation_products WHERE generation_id = $2
+          )
+          OR a.id IN (
+            SELECT asset_id FROM generation_results WHERE generation_id = $2
+          )`,
+      [generation.rows[0].model_asset_id, req.params.id]
+    );
+    const assetIds = assetResult.rows.map((asset) => asset.id);
+    storagePaths = assetResult.rows.map((asset) => asset.storage_path);
+
+    await client.query("DELETE FROM generations WHERE id = $1", [req.params.id]);
+    if (assetIds.length) {
+      await client.query("DELETE FROM assets WHERE id = ANY($1::uuid[])", [assetIds]);
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  await Promise.allSettled(storagePaths.map((storagePath) => fs.unlink(absoluteStoragePath(storagePath))));
+  res.status(204).send();
 }));
 
 router.post("/:id/unfold", asyncHandler(async (req, res) => {

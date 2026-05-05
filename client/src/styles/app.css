@@ -359,14 +359,13 @@ button:disabled {
 .history-item {
   width: 100%;
   display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 11px;
+  grid-template-columns: 1fr 34px;
+  gap: 6px;
   align-items: center;
-  text-align: left;
   border: 1px solid transparent;
   background: transparent;
   border-radius: 8px;
-  padding: 8px;
+  padding: 6px;
   color: #172033;
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
@@ -378,6 +377,41 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.history-open {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 11px;
+  align-items: center;
+  text-align: left;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.history-delete {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+}
+
+.history-delete:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.history-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .history-item img,
 .thumb-placeholder {
   width: 54px;
@@ -387,13 +421,13 @@ button:disabled {
   background: #e2e8f0;
 }
 
-.history-item span {
+.history-open span {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.history-item strong {
+.history-open strong {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

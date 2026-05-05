@@ -172,6 +172,20 @@ function Studio({ user, onLogout }) {
     setSelectedGeneration(await api.getGeneration(id));
   }
 
+  async function deleteGeneration(id) {
+    const generation = generations.find((item) => item.id === id);
+    const createdAt = generation ? new Date(generation.created_at).toLocaleString("pt-BR") : "selecionado";
+    if (!window.confirm(`Excluir este item do histórico (${createdAt})?`)) return;
+
+    await api.deleteGeneration(id);
+    if (selectedGenerationId === id) {
+      setSelectedGenerationId(null);
+      setSelectedGeneration(null);
+    }
+    const data = await api.listGenerations(selectedProjectId);
+    setGenerations(data.generations);
+  }
+
   async function onCreated(generation) {
     setSelectedGenerationId(generation.id);
     setSelectedGeneration(await api.getGeneration(generation.id));
@@ -221,7 +235,12 @@ function Studio({ user, onLogout }) {
               setSelectedProjectId(project.id);
             }}
           />
-          <GenerationList generations={generations} selectedId={selectedGenerationId} onOpen={openGeneration} />
+          <GenerationList
+            generations={generations}
+            selectedId={selectedGenerationId}
+            onOpen={openGeneration}
+            onDelete={deleteGeneration}
+          />
         </aside>
 
         <section className="main-column">
@@ -384,9 +403,19 @@ function ProjectPicker({ projects, selectedProjectId, setSelectedProjectId, onPr
   );
 }
 
-function GenerationList({ generations, selectedId, onOpen }) {
+function GenerationList({ generations, selectedId, onOpen, onDelete }) {
   const [filter, setFilter] = useState("all");
+  const [deletingId, setDeletingId] = useState(null);
   const filteredGenerations = generations.filter((generation) => filter === "all" || generation.status === filter);
+
+  async function deleteItem(generationId) {
+    setDeletingId(generationId);
+    try {
+      await onDelete(generationId);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <section className="panel generation-list">
@@ -401,17 +430,31 @@ function GenerationList({ generations, selectedId, onOpen }) {
       </div>
       {filteredGenerations.length === 0 && <p className="muted">Nenhuma geração neste filtro.</p>}
       {filteredGenerations.map((generation) => (
-        <button
+        <div
           className={`history-item ${selectedId === generation.id ? "active" : ""}`}
           key={generation.id}
-          onClick={() => onOpen(generation.id)}
         >
-          {generation.baseUrl ? <img src={`${FILE_BASE_URL}${generation.baseUrl}`} alt="" /> : <div className="thumb-placeholder" />}
-          <span>
-            <strong>{statusLabel(generation.status)}</strong>
-            <small>{new Date(generation.created_at).toLocaleString("pt-BR")}</small>
-          </span>
-        </button>
+          <button className="history-open" type="button" onClick={() => onOpen(generation.id)}>
+            {generation.baseUrl ? <img src={`${FILE_BASE_URL}${generation.baseUrl}`} alt="" /> : <div className="thumb-placeholder" />}
+            <span>
+              <strong>{statusLabel(generation.status)}</strong>
+              <small>{new Date(generation.created_at).toLocaleString("pt-BR")}</small>
+            </span>
+          </button>
+          <button
+            className="history-delete"
+            type="button"
+            title="Excluir do histórico"
+            aria-label="Excluir do histórico"
+            disabled={deletingId === generation.id || generation.status === "processing"}
+            onClick={(event) => {
+              event.stopPropagation();
+              deleteItem(generation.id).catch((err) => alert(err.message));
+            }}
+          >
+            {deletingId === generation.id ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}
+          </button>
+        </div>
       ))}
     </section>
   );

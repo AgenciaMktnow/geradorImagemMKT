@@ -36,6 +36,7 @@ export const api = {
   getGeneration: (id) => request(`/generations/${id}`),
   createGeneration: (formData) => request("/generations", { method: "POST", body: formData }),
   createBannerUnfold: (formData) => request("/generations/banner-unfold", { method: "POST", body: formData }),
+  deleteGeneration: (id) => request(`/generations/${id}`, { method: "DELETE" }),
   unfoldGeneration: (id, presetIds) => request(`/generations/${id}/unfold`, {
     method: "POST",
     body: JSON.stringify({ presetIds })
