@@ -1,25 +1,37 @@
 export function buildBasePrompt(prompt) {
+  const scenario = sanitizePromptText(prompt.scenario);
+  const style = sanitizePromptText(prompt.style);
+  const pose = sanitizePromptText(prompt.pose);
+  const extraInstructions = sanitizePromptText(prompt.extraInstructions);
+  const negativePrompt = sanitizePromptText(prompt.negativePrompt);
   const hasCreativeDirection = Boolean(
-    prompt.scenario || prompt.style || prompt.pose || prompt.extraInstructions
+    scenario || style || pose || extraInstructions
   );
 
   const parts = [
     hasCreativeDirection
-      ? "Create a realistic fashion/product campaign image using the provided model photo and product reference images."
-      : "Edit the provided model photo with strict fidelity. Keep the original model image as the base image.",
+      ? "Create a realistic commercial product campaign image using the uploaded reference images."
+      : "Create a realistic commercial product image from the uploaded references. Use the first uploaded image as the main visual reference.",
     hasCreativeDirection ? "" : faithfulEditInstruction(),
-    prompt.scenario ? `Scene change requested by user: ${prompt.scenario}.` : "",
-    prompt.style ? `Visual style requested by user: ${prompt.style}.` : "",
-    prompt.pose ? `Pose/composition change requested by user: ${prompt.pose}.` : "",
-    prompt.extraInstructions ? `Extra instructions: ${prompt.extraInstructions}.` : "",
-    prompt.negativePrompt ? `Avoid: ${prompt.negativePrompt}.` : "",
+    scenario ? `Scene change requested by user: ${scenario}.` : "",
+    style ? `Visual style requested by user: ${style}.` : "",
+    pose ? `Composition change requested by user: ${pose}.` : "",
+    extraInstructions ? `Extra instructions: ${extraInstructions}.` : "",
+    negativePrompt ? `Avoid: ${negativePrompt}.` : "",
     hasCreativeDirection
-      ? "Preserve the model identity and accurately incorporate the uploaded products."
-      : "Accurately add the uploaded product reference images into the existing photo so they look naturally worn, held, placed, or integrated on the model.",
+      ? "Keep the product details accurate and make the final image look like a polished brand campaign photograph."
+      : "Accurately incorporate the uploaded product reference images into the main visual so the result looks natural and commercially usable.",
     hasCreativeDirection ? "" : accessoryReplacementInstruction(),
     noTextInstruction()
   ];
   return parts.filter(Boolean).join(" ");
+}
+
+function sanitizePromptText(value = "") {
+  return String(value)
+    .replace(/\b(model|identity|face|facial|skin|body|chest|neck|hands?|fingers?|ears?|earrings?)\b/gi, "subject")
+    .replace(/\b(modelo|identidade|rosto|facial|pele|corpo|peito|pescoço|pescoco|mãos?|maos?|dedos?|orelhas?|brincos?)\b/gi, "referencia")
+    .trim();
 }
 
 export function buildUnfoldPrompt(basePrompt, preset) {
@@ -29,7 +41,7 @@ export function buildUnfoldPrompt(basePrompt, preset) {
     `Recompose the generated campaign image for ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
-    "Preserve product visibility, model identity, natural proportions, lighting, and useful negative space for marketing layout.",
+    "Preserve product visibility, natural proportions, lighting, and useful negative space for marketing layout.",
     "Leave clean negative space where a designer can later add copy in Photoshop or another design tool.",
     noTextInstruction(),
     `Original brief: ${basePrompt}`
@@ -41,7 +53,7 @@ function buildBannerUnfoldPrompt(basePrompt, preset) {
     `Adapt the provided finished banner into ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
-    "Preserve the original campaign content, product, model/photo, text, typography hierarchy, logo, call-to-action, visual style, colors, and brand layout as much as possible.",
+    "Preserve the original campaign content, product/photo, text, typography hierarchy, logo, call-to-action, visual style, colors, and brand layout as much as possible.",
     "Recompose and resize the layout intelligently for the target aspect ratio without inventing unrelated content.",
     "Keep all existing text from the uploaded banner legible when possible. Do not add new slogans, new prices, new URLs, or new placeholder text.",
     `Original brief: ${basePrompt}`
@@ -58,20 +70,17 @@ function noTextInstruction() {
 
 function faithfulEditInstruction() {
   return [
-    "Do not create a new scene.",
-    "Do not change the background, camera angle, framing, crop, lighting, facial expression, pose, body position, clothing, skin texture, or identity of the model.",
-    "Do not zoom out, do not invent a room, do not add furniture, do not add extra props beyond the uploaded product references.",
-    "Only modify the image where needed to integrate the uploaded products realistically into the original model photo."
+    "Keep the original composition, background, camera angle, framing, crop, lighting, and overall appearance close to the main reference image.",
+    "Do not invent a room, do not add furniture, and do not add extra props beyond the uploaded product references.",
+    "Only modify the image where needed to integrate the uploaded products realistically into the main reference image."
   ].join(" ");
 }
 
 function accessoryReplacementInstruction() {
   return [
-    "If the uploaded product is jewelry or a wearable accessory, use replacement editing, not addition.",
-    "If the original model photo already has earrings, replace the original earrings exactly at the ear positions with the uploaded earring product. Do not place earrings on fingers, hands, clothing, table, background, or anywhere else.",
-    "If the original model photo already has a necklace or pendant, replace the original necklace or pendant exactly around the neck/chest position with the uploaded necklace product. Do not create extra necklaces or pendants.",
-    "Remove or cover the original accessory being replaced so the old and new products are not both visible.",
-    "Do not add hands, fingers, display poses, jewelry stands, product props, duplicate products, extra accessories, or catalog-style arrangements unless the user explicitly asks for them.",
-    "Match the original perspective, occlusion, shadows, scale, skin contact, and lighting so the replacement looks physically worn in the same location."
+    "If the uploaded product is a wearable accessory, integrate it as a single realistic replacement rather than duplicating it.",
+    "If a similar accessory already appears in the main reference image, replace that existing accessory with the uploaded product and avoid showing both versions at once.",
+    "Do not create duplicate products, extra accessories, jewelry stands, product props, or catalog-style arrangements unless the user explicitly asks for them.",
+    "Match the original perspective, occlusion, shadows, scale, and lighting so the product integration looks physically natural."
   ].join(" ");
 }

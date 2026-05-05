@@ -13,8 +13,27 @@ describe("prompt builders", () => {
 
     expect(prompt).toContain("studio clean");
     expect(prompt).toContain("premium editorial");
-    expect(prompt).toContain("Avoid: distorted hands");
+    expect(prompt).toContain("Avoid: distorted subject");
     expect(prompt).toContain("Do not render any text");
+    expect(prompt).not.toContain("model identity");
+  });
+
+  it("sanitizes sensitive body and identity terms before sending prompts to Gemini", () => {
+    const prompt = buildBasePrompt({
+      scenario: "",
+      style: "",
+      pose: "Modelo em pé",
+      extraInstructions: "preserve face and skin",
+      negativePrompt: "Mãos distorcidas, produto deformado"
+    });
+
+    expect(prompt).toContain("referencia em pé");
+    expect(prompt).toContain("preserve subject and subject");
+    expect(prompt).toContain("referencia distorcidas");
+    expect(prompt).not.toContain("Modelo");
+    expect(prompt).not.toContain("face");
+    expect(prompt).not.toContain("skin");
+    expect(prompt).not.toContain("Mãos");
   });
 
   it("defaults to faithful edit mode when no creative direction is provided", () => {
@@ -26,11 +45,12 @@ describe("prompt builders", () => {
       negativePrompt: ""
     });
 
-    expect(prompt).toContain("strict fidelity");
-    expect(prompt).toContain("Do not create a new scene");
+    expect(prompt).toContain("main visual reference");
+    expect(prompt).toContain("Keep the original composition");
     expect(prompt).toContain("Only modify the image where needed");
-    expect(prompt).toContain("replace the original earrings exactly at the ear positions");
-    expect(prompt).toContain("Do not add hands");
+    expect(prompt).toContain("replace that existing accessory");
+    expect(prompt).not.toContain("skin texture");
+    expect(prompt).not.toContain("neck/chest");
   });
 
   it("builds an unfold prompt with dimensions", () => {
