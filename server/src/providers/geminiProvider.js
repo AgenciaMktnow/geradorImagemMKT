@@ -82,7 +82,7 @@ async function callGemini({ prompt, assets, width, height }) {
   assertGeminiConfigured();
   const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
   try {
-    const request = buildGeminiImageRequest({
+    const request = await buildGeminiImageRequest({
       model: env.geminiImageModel,
       prompt,
       assets
