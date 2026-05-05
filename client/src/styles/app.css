@@ -1042,18 +1042,19 @@ button:disabled {
 .app-shell .tool-tabs button::after {
   content: "";
   position: absolute;
-  right: -26px;
-  top: -26px;
-  width: 132px;
-  height: 132px;
-  border-radius: 28px;
+  right: 14px;
+  top: 12px;
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
   opacity: 0.28;
-  background: radial-gradient(circle, var(--accent) 0 34%, transparent 35%);
-  transform: rotate(22deg);
+  background: var(--accent);
+  transform: none;
+  pointer-events: none;
 }
 
 .app-shell .tool-tabs button:nth-child(2)::after {
-  background: radial-gradient(circle, var(--accent-2) 0 34%, transparent 35%);
+  background: var(--accent-2);
 }
 
 .app-shell .tool-tabs button svg {
