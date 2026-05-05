@@ -5,6 +5,7 @@ import { env } from "../config/env.js";
 import { absoluteStoragePath, generatedDir } from "../storage/paths.js";
 
 const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const GEMINI_UPLOAD_URL = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 
 function assertGeminiConfigured() {
   if (!env.geminiApiKey) {
@@ -12,16 +13,6 @@ function assertGeminiConfigured() {
     error.statusCode = 500;
     throw error;
   }
-}
-
-async function filePart(asset) {
-  const bytes = await fs.readFile(absoluteStoragePath(asset.storage_path));
-  return {
-    inline_data: {
-      mime_type: asset.mime_type,
-      data: bytes.toString("base64")
-    }
-  };
 }
 
 async function saveInlineImage(part, fallbackWidth, fallbackHeight) {
@@ -66,9 +57,96 @@ function summarizeNoImageResponse(response) {
   return [candidateKeys, partSummary, finishReason, safety, promptFeedback, text ? `text=${text}` : null].filter(Boolean).join("; ");
 }
 
-export async function buildGeminiImageRequest({ model, prompt, assets }) {
-  const parts = [{ text: prompt }];
-  for (const asset of assets) parts.push(await filePart(asset));
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { raw: text };
+  }
+}
+
+function errorMessageFromPayload(payload, fallback) {
+  return payload.error?.message ?? payload.raw ?? fallback;
+}
+
+async function startGeminiUpload(asset, sizeBytes) {
+  const response = await fetch(GEMINI_UPLOAD_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": env.geminiApiKey,
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(sizeBytes),
+      "X-Goog-Upload-Header-Content-Type": asset.mime_type
+    },
+    body: JSON.stringify({
+      file: {
+        display_name: path.basename(asset.storage_path)
+      }
+    })
+  });
+
+  const payload = await readJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(`Gemini file upload start failed: HTTP ${response.status}: ${errorMessageFromPayload(payload, response.statusText)}`);
+  }
+
+  const uploadUrl = response.headers.get("x-goog-upload-url");
+  if (!uploadUrl) throw new Error("Gemini file upload start did not return an upload URL");
+  return uploadUrl;
+}
+
+async function uploadGeminiFile(asset) {
+  const absolutePath = absoluteStoragePath(asset.storage_path);
+  const stats = await fs.stat(absolutePath);
+  const uploadUrl = await startGeminiUpload(asset, stats.size);
+  const bytes = await fs.readFile(absolutePath);
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Length": String(stats.size),
+      "X-Goog-Upload-Offset": "0",
+      "X-Goog-Upload-Command": "upload, finalize"
+    },
+    body: bytes
+  });
+
+  const payload = await readJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(`Gemini file upload failed: HTTP ${response.status}: ${errorMessageFromPayload(payload, response.statusText)}`);
+  }
+  if (!payload.file?.uri) throw new Error("Gemini file upload did not return a file URI");
+  return payload.file;
+}
+
+async function deleteGeminiFiles(files) {
+  await Promise.allSettled(
+    files
+      .filter((file) => file?.name)
+      .map((file) =>
+        fetch(`${GEMINI_API_BASE_URL}/${file.name}`, {
+          method: "DELETE",
+          headers: {
+            "x-goog-api-key": env.geminiApiKey
+          }
+        })
+      )
+  );
+}
+
+export function buildGeminiImageRequest({ model, prompt, files }) {
+  const parts = [
+    { text: prompt },
+    ...files.map((file) => ({
+      file_data: {
+        mime_type: file.mimeType,
+        file_uri: file.uri
+      }
+    }))
+  ];
   return {
     model,
     body: {
@@ -92,15 +170,9 @@ async function callGeminiApi({ model, body }) {
       body: JSON.stringify(body),
       signal: controller.signal
     });
-    const text = await response.text();
-    let payload;
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = { raw: text };
-    }
+    const payload = await readJsonResponse(response);
     if (!response.ok) {
-      const message = payload.error?.message ?? text ?? `HTTP ${response.status}`;
+      const message = errorMessageFromPayload(payload, `HTTP ${response.status}`);
       throw new Error(`HTTP ${response.status}: ${message}`);
     }
     return payload;
@@ -116,11 +188,16 @@ async function callGeminiApi({ model, body }) {
 
 async function callGemini({ prompt, assets, width, height }) {
   assertGeminiConfigured();
+  const files = [];
   try {
-    const request = await buildGeminiImageRequest({
+    for (const asset of assets) {
+      files.push(await uploadGeminiFile(asset));
+    }
+
+    const request = buildGeminiImageRequest({
       model: env.geminiImageModel,
       prompt,
-      assets
+      files
     });
 
     const response = await callGeminiApi(request);
@@ -141,6 +218,8 @@ async function callGemini({ prompt, assets, width, height }) {
   } catch (error) {
     const message = geminiErrorMessage(error);
     throw new Error(`Gemini ${env.geminiImageModel} failed: ${message}`);
+  } finally {
+    await deleteGeminiFiles(files);
   }
 }
 
