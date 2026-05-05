@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-model_product_studio}
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studio} -d ${POSTGRES_DB:-model_product_studio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-studio}:${POSTGRES_PASSWORD:-studio_password}@postgres:5432/${POSTGRES_DB:-model_product_studio}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      STORAGE_ROOT: /app/storage
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_IMAGE_MODEL: ${GEMINI_IMAGE_MODEL:-gemini-3.1-flash-image-preview}
+      GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-180000}
+      STALE_JOB_MINUTES: ${STALE_JOB_MINUTES:-5}
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-4}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    volumes:
+      - app_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  app_storage:
