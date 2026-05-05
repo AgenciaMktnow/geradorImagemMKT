@@ -16,7 +16,14 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use("/files", express.static(path.resolve(storageRoot)));
 
-  app.get("/api/health", (req, res) => res.json({ ok: true }));
+  app.get("/api/health", (req, res) =>
+    res.json({
+      ok: true,
+      aiProvider: env.aiProvider,
+      geminiConfigured: Boolean(env.geminiApiKey),
+      geminiImageModel: env.geminiImageModel
+    })
+  );
   app.use("/api/auth", authRoutes);
   app.use("/api/projects", projectRoutes);
   app.use("/api/presets", presetRoutes);

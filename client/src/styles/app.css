@@ -9,7 +9,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; } 
 
 .center-screen,
 .auth-layout {
