@@ -52,14 +52,18 @@ function geminiErrorMessage(error) {
 function summarizeNoImageResponse(response) {
   const candidate = response.candidates?.[0];
   const parts = candidate?.content?.parts ?? [];
+  const partKeys = parts.map((part) => Object.keys(part).join("+")).join(",");
   const text = parts
     .filter((part) => part.text)
     .map((part) => part.text.trim())
     .join(" ")
     .slice(0, 500);
+  const promptFeedback = response.promptFeedback ? `promptFeedback=${JSON.stringify(response.promptFeedback).slice(0, 500)}` : null;
+  const candidateKeys = candidate ? `candidateKeys=${Object.keys(candidate).join(",")}` : "candidateKeys=none";
+  const partSummary = `parts=${parts.length}${partKeys ? `:${partKeys}` : ""}`;
   const finishReason = candidate?.finishReason ? `finishReason=${candidate.finishReason}` : null;
   const safety = candidate?.safetyRatings?.length ? `safety=${JSON.stringify(candidate.safetyRatings).slice(0, 500)}` : null;
-  return [finishReason, safety, text ? `text=${text}` : null].filter(Boolean).join("; ");
+  return [candidateKeys, partSummary, finishReason, safety, promptFeedback, text ? `text=${text}` : null].filter(Boolean).join("; ");
 }
 
 export async function buildGeminiImageRequest({ model, prompt, assets }) {

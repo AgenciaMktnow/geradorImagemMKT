@@ -11,7 +11,8 @@ describe("health endpoint", () => {
       ok: true,
       aiProvider: env.aiProvider,
       geminiConfigured: Boolean(env.geminiApiKey),
-      geminiImageModel: env.geminiImageModel
+      geminiImageModel: env.geminiImageModel,
+      geminiTransport: "rest"
     });
     if (env.geminiApiKey) expect(response.text).not.toContain(env.geminiApiKey);
   });

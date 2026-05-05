@@ -21,7 +21,8 @@ export function createApp() {
       ok: true,
       aiProvider: env.aiProvider,
       geminiConfigured: Boolean(env.geminiApiKey),
-      geminiImageModel: env.geminiImageModel
+      geminiImageModel: env.geminiImageModel,
+      geminiTransport: "rest"
     })
   );
   app.use("/api/auth", authRoutes);
