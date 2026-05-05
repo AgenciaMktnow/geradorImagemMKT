@@ -25,14 +25,20 @@ describe("Gemini provider response handling", () => {
     });
 
     expect(request.model).toBe("gemini-3.1-flash-image-preview");
-    expect(request.config).toBeUndefined();
-    expect(request.contents).toHaveLength(2);
-    expect(request.contents[0]).toEqual({ text: "Create the campaign image" });
-    expect(request.contents[1]).toEqual({
-      inlineData: {
-        mimeType: "image/png",
-        data: "Cg=="
-      }
+    expect(request.body).toEqual({
+      contents: [
+        {
+          parts: [
+            { text: "Create the campaign image" },
+            {
+              inline_data: {
+                mime_type: "image/png",
+                data: "Cg=="
+              }
+            }
+          ]
+        }
+      ]
     });
   });
 });

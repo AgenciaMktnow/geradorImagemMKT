@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { GoogleGenAI } from "@google/genai";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env.js";
 import { absoluteStoragePath, generatedDir } from "../storage/paths.js";
+
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 function assertGeminiConfigured() {
   if (!env.geminiApiKey) {
@@ -16,8 +17,8 @@ function assertGeminiConfigured() {
 async function filePart(asset) {
   const bytes = await fs.readFile(absoluteStoragePath(asset.storage_path));
   return {
-    inlineData: {
-      mimeType: asset.mime_type,
+    inline_data: {
+      mime_type: asset.mime_type,
       data: bytes.toString("base64")
     }
   };
@@ -48,14 +49,6 @@ function geminiErrorMessage(error) {
   }
 }
 
-async function generateContent(ai, request) {
-  return withTimeout(
-    ai.models.generateContent(request),
-    env.geminiTimeoutMs,
-    `Gemini image generation timed out after ${Math.round(env.geminiTimeoutMs / 1000)}s`
-  );
-}
-
 function summarizeNoImageResponse(response) {
   const candidate = response.candidates?.[0];
   const parts = candidate?.content?.parts ?? [];
@@ -70,17 +63,55 @@ function summarizeNoImageResponse(response) {
 }
 
 export async function buildGeminiImageRequest({ model, prompt, assets }) {
-  const contents = [{ text: prompt }];
-  for (const asset of assets) contents.push(await filePart(asset));
+  const parts = [{ text: prompt }];
+  for (const asset of assets) parts.push(await filePart(asset));
   return {
     model,
-    contents
+    body: {
+      contents: [{ parts }]
+    }
   };
+}
+
+async function callGeminiApi({ model, body }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), env.geminiTimeoutMs);
+  const url = `${GEMINI_API_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.geminiApiKey
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const text = await response.text();
+    let payload;
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = { raw: text };
+    }
+    if (!response.ok) {
+      const message = payload.error?.message ?? text ?? `HTTP ${response.status}`;
+      throw new Error(`HTTP ${response.status}: ${message}`);
+    }
+    return payload;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Gemini image generation timed out after ${Math.round(env.geminiTimeoutMs / 1000)}s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function callGemini({ prompt, assets, width, height }) {
   assertGeminiConfigured();
-  const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
   try {
     const request = await buildGeminiImageRequest({
       model: env.geminiImageModel,
@@ -88,27 +119,25 @@ async function callGemini({ prompt, assets, width, height }) {
       assets
     });
 
-    const response = await generateContent(ai, request);
+    const response = await callGeminiApi(request);
     const parts = response.candidates?.[0]?.content?.parts ?? [];
-    const imageParts = parts.filter((part) => part.inlineData && !part.thought);
+    const imageParts = parts.filter((part) => (part.inlineData || part.inline_data) && !part.thought);
     const imagePart = imageParts.at(-1);
     if (!imagePart) {
       const details = summarizeNoImageResponse(response);
       throw new Error(`Gemini model ${env.geminiImageModel} did not return an image${details ? ` (${details})` : ""}`);
+    }
+    if (imagePart.inline_data && !imagePart.inlineData) {
+      imagePart.inlineData = {
+        mimeType: imagePart.inline_data.mime_type,
+        data: imagePart.inline_data.data
+      };
     }
     return saveInlineImage(imagePart, width, height);
   } catch (error) {
     const message = geminiErrorMessage(error);
     throw new Error(`Gemini ${env.geminiImageModel} failed: ${message}`);
   }
-}
-
-function withTimeout(promise, timeoutMs, message) {
-  let timer;
-  const timeout = new Promise((resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 export const geminiProvider = {
