@@ -1,10 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createPartFromUri, createUserContent, GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env.js";
 import { absoluteStoragePath, generatedDir } from "../storage/paths.js";
-import { imageConfigForDimensions } from "./geminiImageConfig.js";
 
 function assertGeminiConfigured() {
   if (!env.geminiApiKey) {
@@ -14,14 +13,13 @@ function assertGeminiConfigured() {
   }
 }
 
-async function uploadFilePart(ai, asset) {
-  const file = await ai.files.upload({
-    file: absoluteStoragePath(asset.storage_path),
-    config: { mimeType: asset.mime_type }
-  });
+async function filePart(asset) {
+  const bytes = await fs.readFile(absoluteStoragePath(asset.storage_path));
   return {
-    file,
-    part: createPartFromUri(file.uri, file.mimeType)
+    inlineData: {
+      mimeType: asset.mime_type,
+      data: bytes.toString("base64")
+    }
   };
 }
 
@@ -58,54 +56,50 @@ async function generateContent(ai, request) {
   );
 }
 
-export function buildGeminiImageRequest({ model, prompt, fileParts, width, height }) {
-  const contents = createUserContent([{ text: prompt }, ...fileParts]);
-  return {
-    model,
-    contents,
-    config: {
-      responseModalities: ["IMAGE"],
-      imageConfig: imageConfigForDimensions(width, height)
-    }
-  };
+function summarizeNoImageResponse(response) {
+  const candidate = response.candidates?.[0];
+  const parts = candidate?.content?.parts ?? [];
+  const text = parts
+    .filter((part) => part.text)
+    .map((part) => part.text.trim())
+    .join(" ")
+    .slice(0, 500);
+  const finishReason = candidate?.finishReason ? `finishReason=${candidate.finishReason}` : null;
+  const safety = candidate?.safetyRatings?.length ? `safety=${JSON.stringify(candidate.safetyRatings).slice(0, 500)}` : null;
+  return [finishReason, safety, text ? `text=${text}` : null].filter(Boolean).join("; ");
 }
 
-async function deleteUploadedFiles(ai, files) {
-  await Promise.allSettled(
-    files
-      .filter((file) => file?.name)
-      .map((file) => ai.files.delete({ name: file.name }))
-  );
+export async function buildGeminiImageRequest({ model, prompt, assets }) {
+  const contents = [{ text: prompt }];
+  for (const asset of assets) contents.push(await filePart(asset));
+  return {
+    model,
+    contents
+  };
 }
 
 async function callGemini({ prompt, assets, width, height }) {
   assertGeminiConfigured();
   const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
-  const uploaded = [];
   try {
-    const uploads = [];
-    for (const asset of assets) uploads.push(await uploadFilePart(ai, asset));
-    uploaded.push(...uploads.map((upload) => upload.file));
-
     const request = buildGeminiImageRequest({
       model: env.geminiImageModel,
       prompt,
-      fileParts: uploads.map((upload) => upload.part),
-      width,
-      height
+      assets
     });
 
     const response = await generateContent(ai, request);
     const parts = response.candidates?.[0]?.content?.parts ?? [];
     const imageParts = parts.filter((part) => part.inlineData && !part.thought);
     const imagePart = imageParts.at(-1);
-    if (!imagePart) throw new Error(`Gemini model ${env.geminiImageModel} did not return an image`);
+    if (!imagePart) {
+      const details = summarizeNoImageResponse(response);
+      throw new Error(`Gemini model ${env.geminiImageModel} did not return an image${details ? ` (${details})` : ""}`);
+    }
     return saveInlineImage(imagePart, width, height);
   } catch (error) {
     const message = geminiErrorMessage(error);
     throw new Error(`Gemini ${env.geminiImageModel} failed: ${message}`);
-  } finally {
-    await deleteUploadedFiles(ai, uploaded);
   }
 }
 

@@ -12,23 +12,27 @@ describe("Gemini provider response handling", () => {
     expect(finalImage.inlineData.data).toBe("final");
   });
 
-  it("builds a Gemini 3.1 image request with file references", () => {
-    const request = buildGeminiImageRequest({
+  it("builds a minimal Gemini 3.1 image request with inline images", async () => {
+    const request = await buildGeminiImageRequest({
       model: "gemini-3.1-flash-image-preview",
       prompt: "Create the campaign image",
-      fileParts: [{ fileData: { fileUri: "https://generativelanguage.googleapis.com/v1beta/files/test", mimeType: "image/png" } }],
-      width: 1400,
-      height: 1800
+      assets: [
+        {
+          mime_type: "image/png",
+          storage_path: "uploads/.gitkeep"
+        }
+      ]
     });
 
     expect(request.model).toBe("gemini-3.1-flash-image-preview");
-    expect(request.config).toEqual({
-      responseModalities: ["IMAGE"],
-      imageConfig: {
-        aspectRatio: "4:5",
-        imageSize: "2K"
+    expect(request.config).toBeUndefined();
+    expect(request.contents).toHaveLength(2);
+    expect(request.contents[0]).toEqual({ text: "Create the campaign image" });
+    expect(request.contents[1]).toEqual({
+      inlineData: {
+        mimeType: "image/png",
+        data: "Cg=="
       }
     });
-    expect(request.contents.parts).toHaveLength(2);
   });
 });
