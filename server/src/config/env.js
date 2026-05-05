@@ -15,7 +15,7 @@ export const env = {
   storageRoot: process.env.STORAGE_ROOT ?? "./storage",
   aiProvider: process.env.AI_PROVIDER ?? "mock",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
-  geminiImageModel: process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image",
+  geminiImageModel: process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image-preview",
   geminiTimeoutMs: Number(process.env.GEMINI_TIMEOUT_MS ?? 180000),
   staleJobMinutes: Number(process.env.STALE_JOB_MINUTES ?? 5),
   jobConcurrency: Number(process.env.JOB_CONCURRENCY ?? 4)

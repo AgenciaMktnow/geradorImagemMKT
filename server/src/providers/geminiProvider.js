@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { GoogleGenAI } from "@google/genai";
+import { createPartFromUri, createUserContent, GoogleGenAI } from "@google/genai";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env.js";
 import { absoluteStoragePath, generatedDir } from "../storage/paths.js";
@@ -14,13 +14,14 @@ function assertGeminiConfigured() {
   }
 }
 
-async function filePart(asset) {
-  const bytes = await fs.readFile(absoluteStoragePath(asset.storage_path));
+async function uploadFilePart(ai, asset) {
+  const file = await ai.files.upload({
+    file: absoluteStoragePath(asset.storage_path),
+    config: { mimeType: asset.mime_type }
+  });
   return {
-    inlineData: {
-      mimeType: asset.mime_type,
-      data: bytes.toString("base64")
-    }
+    file,
+    part: createPartFromUri(file.uri, file.mimeType)
   };
 }
 
@@ -39,34 +40,73 @@ async function saveInlineImage(part, fallbackWidth, fallbackHeight) {
   };
 }
 
-async function callGemini({ prompt, assets, width, height, imageConfig }) {
-  assertGeminiConfigured();
-  const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
-  const contents = [{ text: prompt }];
-  for (const asset of assets) contents.push(await filePart(asset));
-
-  const request = {
-    model: env.geminiImageModel,
-    contents
-  };
-  if (imageConfig) {
-    request.config = {
-      responseModalities: ["TEXT", "IMAGE"],
-      imageConfig
-    };
+function geminiErrorMessage(error) {
+  if (!error?.message) return "Gemini request failed";
+  try {
+    const parsed = JSON.parse(error.message);
+    return parsed.error?.message ?? error.message;
+  } catch {
+    return error.message;
   }
+}
 
-  const response = await withTimeout(
+async function generateContent(ai, request) {
+  return withTimeout(
     ai.models.generateContent(request),
     env.geminiTimeoutMs,
     `Gemini image generation timed out after ${Math.round(env.geminiTimeoutMs / 1000)}s`
   );
+}
 
-  const parts = response.candidates?.[0]?.content?.parts ?? [];
-  const imageParts = parts.filter((part) => part.inlineData && !part.thought);
-  const imagePart = imageParts.at(-1);
-  if (!imagePart) throw new Error("Gemini did not return an image");
-  return saveInlineImage(imagePart, width, height);
+export function buildGeminiImageRequest({ model, prompt, fileParts, width, height }) {
+  const contents = createUserContent([{ text: prompt }, ...fileParts]);
+  return {
+    model,
+    contents,
+    config: {
+      responseModalities: ["IMAGE"],
+      imageConfig: imageConfigForDimensions(width, height)
+    }
+  };
+}
+
+async function deleteUploadedFiles(ai, files) {
+  await Promise.allSettled(
+    files
+      .filter((file) => file?.name)
+      .map((file) => ai.files.delete({ name: file.name }))
+  );
+}
+
+async function callGemini({ prompt, assets, width, height }) {
+  assertGeminiConfigured();
+  const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
+  const uploaded = [];
+  try {
+    const uploads = [];
+    for (const asset of assets) uploads.push(await uploadFilePart(ai, asset));
+    uploaded.push(...uploads.map((upload) => upload.file));
+
+    const request = buildGeminiImageRequest({
+      model: env.geminiImageModel,
+      prompt,
+      fileParts: uploads.map((upload) => upload.part),
+      width,
+      height
+    });
+
+    const response = await generateContent(ai, request);
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+    const imageParts = parts.filter((part) => part.inlineData && !part.thought);
+    const imagePart = imageParts.at(-1);
+    if (!imagePart) throw new Error(`Gemini model ${env.geminiImageModel} did not return an image`);
+    return saveInlineImage(imagePart, width, height);
+  } catch (error) {
+    const message = geminiErrorMessage(error);
+    throw new Error(`Gemini ${env.geminiImageModel} failed: ${message}`);
+  } finally {
+    await deleteUploadedFiles(ai, uploaded);
+  }
 }
 
 function withTimeout(promise, timeoutMs, message) {
@@ -84,8 +124,7 @@ export const geminiProvider = {
       prompt,
       assets: [modelAsset, ...productAssets],
       width: 1400,
-      height: 1800,
-      imageConfig: imageConfigForDimensions(1400, 1800)
+      height: 1800
     });
   },
   generateUnfold({ prompt, baseAsset, preset }) {
@@ -93,8 +132,7 @@ export const geminiProvider = {
       prompt,
       assets: [baseAsset],
       width: preset.width,
-      height: preset.height,
-      imageConfig: imageConfigForDimensions(preset.width, preset.height)
+      height: preset.height
     });
   }
 };
