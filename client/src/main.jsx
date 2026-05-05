@@ -5,8 +5,10 @@ import {
   ImagePlus,
   Loader2,
   LogOut,
+  Moon,
   RefreshCcw,
   Sparkles,
+  Sun,
   Trash2,
   UploadCloud,
   WandSparkles
@@ -124,6 +126,11 @@ function Studio({ user, onLogout }) {
   const [selectedGeneration, setSelectedGeneration] = useState(null);
   const [toolMode, setToolMode] = useState("model");
   const [error, setError] = useState("");
+  const [theme, setTheme] = useState(() => localStorage.getItem("studio_theme") ?? "dark");
+
+  useEffect(() => {
+    localStorage.setItem("studio_theme", theme);
+  }, [theme]);
 
   async function refreshAll() {
     const [projectData, presetData] = await Promise.all([api.listProjects(), api.listPresets()]);
@@ -178,7 +185,7 @@ function Studio({ user, onLogout }) {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme={theme}>
       <header className="topbar">
         <div className="brand-row compact">
           <div className="brand-mark"><WandSparkles size={20} /></div>
@@ -187,7 +194,18 @@ function Studio({ user, onLogout }) {
             <p>{user.email}</p>
           </div>
         </div>
-        <button className="ghost-button" onClick={onLogout}><LogOut size={18} /> Sair</button>
+        <div className="topbar-actions">
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            {theme === "dark" ? "Modo claro" : "Modo escuro"}
+          </button>
+          <button className="ghost-button" onClick={onLogout}><LogOut size={18} /> Sair</button>
+        </div>
       </header>
 
       {error && <div className="notice error">{error}</div>}
