@@ -317,18 +317,44 @@ function PresetSelector({ presets, selectedPresetIds, setSelectedPresetIds }) {
   );
 }
 
-function FileDrop({ label, helper, file, multiple = false, onChange }) {
+function FileDrop({ label, helper, files = [], multiple = false, onChange }) {
+  const previews = useMemo(
+    () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    [files]
+  );
+
+  useEffect(() => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)), [previews]);
+
   return (
-    <label className={`drop-field ${file ? "has-file" : ""}`}>
-      <UploadCloud size={22} />
-      <span>{label}</span>
+    <label className={`drop-field ${previews.length ? "has-file" : ""}`}>
+      {previews.length ? (
+        <div className={`upload-preview-grid ${multiple ? "multiple" : ""}`}>
+          {previews.map((preview) => (
+            <figure className="upload-preview" key={`${preview.file.name}-${preview.file.lastModified}`}>
+              <img src={preview.url} alt="" />
+              <figcaption>{preview.file.name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : (
+        <>
+          <UploadCloud size={22} />
+          <span>{label}</span>
+          <small>{helper}</small>
+        </>
+      )}
       <input
         type="file"
         accept="image/png,image/jpeg,image/webp"
         multiple={multiple}
         onChange={onChange}
       />
-      <small>{file ? file : helper}</small>
+      {previews.length > 0 && (
+        <span className="upload-preview-label">
+          {label}
+          <small>{multiple ? `${previews.length} imagem(ns)` : previews[0].file.name}</small>
+        </span>
+      )}
     </label>
   );
 }
@@ -511,13 +537,13 @@ function GenerationForm({ projectId, presets, onCreated }) {
               <FileDrop
                 label="Imagem do modelo"
                 helper="PNG, JPG ou WebP"
-                file={model?.name}
+                files={model ? [model] : []}
                 onChange={(event) => setModel(event.target.files?.[0] ?? null)}
               />
               <FileDrop
                 label="Produtos"
                 helper="Até 5 imagens"
-                file={products.length ? `${products.length} arquivo(s)` : ""}
+                files={products}
                 multiple
                 onChange={(event) => setProducts(Array.from(event.target.files ?? []).slice(0, 5))}
               />
@@ -595,7 +621,7 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
             <FileDrop
               label="Banner pronto"
               helper="PNG, JPG ou WebP com texto, foto e layout final"
-              file={banner?.name}
+              files={banner ? [banner] : []}
               onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
             />
           </section>
