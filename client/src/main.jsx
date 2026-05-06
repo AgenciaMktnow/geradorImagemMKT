@@ -79,9 +79,8 @@ function AuthPage({ onAuthed }) {
     <main className="auth-layout">
       <section className="auth-panel">
         <div className="brand-row">
-          <div className="brand-mark"><WandSparkles size={22} /></div>
+          <img className="brand-logo" src="/studionow-logo.png" alt="StudioNow" />
           <div>
-            <h1>Studio de Imagens</h1>
             <p>Modelo, produtos e formatos de campanha em um fluxo.</p>
           </div>
         </div>
@@ -202,9 +201,8 @@ function Studio({ user, onLogout }) {
     <main className="app-shell" data-theme={theme}>
       <header className="topbar">
         <div className="brand-row compact">
-          <div className="brand-mark"><WandSparkles size={20} /></div>
+          <img className="brand-logo compact" src="/studionow-logo.png" alt="StudioNow" />
           <div>
-            <h1>Studio de Imagens</h1>
             <p>{user.email}</p>
           </div>
         </div>
