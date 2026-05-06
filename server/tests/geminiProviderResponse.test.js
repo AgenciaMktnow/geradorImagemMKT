@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildGeminiImageRequest } from "../src/providers/geminiProvider.js";
+import sharp from "sharp";
+import { buildGeminiImageRequest, normalizeGeneratedImage } from "../src/providers/geminiProvider.js";
 
 describe("Gemini provider response handling", () => {
   it("documents that final images should be non-thought image parts", () => {
@@ -40,5 +41,29 @@ describe("Gemini provider response handling", () => {
         }
       ]
     });
+  });
+
+  it("normalizes generated images to the requested output dimensions", async () => {
+    const geminiSizedBytes = await sharp({
+      create: {
+        width: 768,
+        height: 1376,
+        channels: 3,
+        background: "#ef9a9a"
+      }
+    })
+      .jpeg()
+      .toBuffer();
+
+    const output = await normalizeGeneratedImage(geminiSizedBytes, {
+      mimeType: "image/jpeg",
+      width: 1080,
+      height: 1920
+    });
+
+    const metadata = await sharp(output.bytes).metadata();
+    expect(output.mimeType).toBe("image/jpeg");
+    expect(metadata.width).toBe(1080);
+    expect(metadata.height).toBe(1920);
   });
 });

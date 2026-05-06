@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env.js";
 import { absoluteStoragePath, generatedDir } from "../storage/paths.js";
@@ -15,16 +16,46 @@ function assertGeminiConfigured() {
   }
 }
 
+function outputFormatForMimeType(mimeType) {
+  if (mimeType === "image/png") return { ext: "png", mimeType: "image/png" };
+  return { ext: "jpg", mimeType: "image/jpeg" };
+}
+
+export async function normalizeGeneratedImage(bytes, { mimeType, width, height }) {
+  const format = outputFormatForMimeType(mimeType);
+  const image = sharp(bytes, { failOn: "none" })
+    .rotate()
+    .resize(width, height, {
+      fit: "cover",
+      position: "center"
+    });
+
+  const normalizedBytes =
+    format.ext === "png"
+      ? await image.png({ compressionLevel: 9 }).toBuffer()
+      : await image.jpeg({ quality: 95, mozjpeg: true }).toBuffer();
+
+  return {
+    bytes: normalizedBytes,
+    ext: format.ext,
+    mimeType: format.mimeType
+  };
+}
+
 async function saveInlineImage(part, fallbackWidth, fallbackHeight) {
-  const ext = part.inlineData.mimeType === "image/png" ? "png" : "jpg";
+  const normalized = await normalizeGeneratedImage(Buffer.from(part.inlineData.data, "base64"), {
+    mimeType: part.inlineData.mimeType,
+    width: fallbackWidth,
+    height: fallbackHeight
+  });
+  const ext = normalized.ext;
   const filename = `${uuid()}.${ext}`;
   const absolutePath = path.join(generatedDir, filename);
-  const bytes = Buffer.from(part.inlineData.data, "base64");
-  await fs.writeFile(absolutePath, bytes);
+  await fs.writeFile(absolutePath, normalized.bytes);
   return {
     storagePath: `generated/${filename}`,
-    mimeType: part.inlineData.mimeType,
-    sizeBytes: bytes.length,
+    mimeType: normalized.mimeType,
+    sizeBytes: normalized.bytes.length,
     width: fallbackWidth,
     height: fallbackHeight
   };
