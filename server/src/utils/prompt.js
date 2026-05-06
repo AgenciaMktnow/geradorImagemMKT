@@ -41,6 +41,7 @@ export function buildUnfoldPrompt(basePrompt, preset) {
     `Recompose the generated campaign image for ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
+    safeAreaInstruction(preset),
     "Preserve product visibility, natural proportions, lighting, and useful negative space for marketing layout.",
     "Leave clean negative space where a designer can later add copy in Photoshop or another design tool.",
     noTextInstruction(),
@@ -53,10 +54,22 @@ function buildBannerUnfoldPrompt(basePrompt, preset) {
     `Adapt the provided finished banner into ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
+    safeAreaInstruction(preset),
     "Preserve the original campaign content, product/photo, text, typography hierarchy, logo, call-to-action, visual style, colors, and brand layout as much as possible.",
     "Recompose and resize the layout intelligently for the target aspect ratio without inventing unrelated content.",
     "Keep all existing text from the uploaded banner legible when possible. Do not add new slogans, new prices, new URLs, or new placeholder text.",
     `Original brief: ${basePrompt}`
+  ].join(" ");
+}
+
+function safeAreaInstruction(preset) {
+  if (preset.slug !== "instagram-story-campaign") return "";
+
+  return [
+    "Instagram campaign story safe areas: keep the top 250px and bottom 350px clear of all main content.",
+    "The background, colors, texture, lighting, and image continuation must extend naturally through those safe areas.",
+    "Do not place products, people, faces, logos, typography, captions, CTA elements, prices, or important visual details inside the top 250px or bottom 350px.",
+    "Place the main campaign composition only between y=250px and y=1570px."
   ].join(" ");
 }
 

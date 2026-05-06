@@ -91,8 +91,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);
 INSERT INTO dimension_presets (slug, name, width, height, channel)
 VALUES
   ('site-desktop-banner', 'Banner site desktop', 1920, 640, 'site'),
-  ('site-mobile-banner', 'Banner site mobile', 1080, 1350, 'site'),
+  ('site-mobile-banner', 'Banner site mobile', 430, 600, 'site'),
   ('instagram-story', 'Instagram story', 1080, 1920, 'instagram'),
+  ('instagram-story-campaign', 'Story Instagram Campanha', 1080, 1920, 'instagram'),
   ('instagram-feed-square', 'Instagram feed quadrado', 1080, 1080, 'instagram'),
   ('instagram-feed-vertical', 'Instagram feed vertical', 1080, 1350, 'instagram'),
   ('google-display-faixa', 'Google display faixa', 1200, 628, 'google'),

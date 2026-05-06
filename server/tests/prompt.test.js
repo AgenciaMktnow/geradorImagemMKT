@@ -56,6 +56,7 @@ describe("prompt builders", () => {
   it("builds an unfold prompt with dimensions", () => {
     const prompt = buildUnfoldPrompt("base brief", {
       name: "Instagram story",
+      slug: "instagram-story",
       width: 1080,
       height: 1920,
       channel: "instagram"
@@ -66,5 +67,19 @@ describe("prompt builders", () => {
     expect(prompt).toContain("base brief");
     expect(prompt).toContain("designer can later add copy");
     expect(prompt).toContain("no graphic design overlays");
+  });
+
+  it("adds safe area guidance for Instagram campaign stories", () => {
+    const prompt = buildUnfoldPrompt("base brief", {
+      name: "Story Instagram Campanha",
+      slug: "instagram-story-campaign",
+      width: 1080,
+      height: 1920,
+      channel: "instagram"
+    });
+
+    expect(prompt).toContain("top 250px and bottom 350px");
+    expect(prompt).toContain("extend naturally through those safe areas");
+    expect(prompt).toContain("between y=250px and y=1570px");
   });
 });
