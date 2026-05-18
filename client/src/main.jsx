@@ -23,6 +23,13 @@ const emptyPrompt = {
   extraInstructions: "",
   negativePrompt: ""
 };
+const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+function oversizedUploadMessage(files) {
+  return files.some((file) => file.size > MAX_UPLOAD_FILE_SIZE_BYTES)
+    ? "Cada imagem deve ter no máximo 5 MB."
+    : "";
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -520,6 +527,20 @@ function GenerationForm({ projectId, presets, onCreated }) {
     }
   }
 
+  function selectModel(file) {
+    const nextModel = file ?? null;
+    const message = nextModel ? oversizedUploadMessage([nextModel]) : "";
+    setError(message);
+    setModel(message ? null : nextModel);
+  }
+
+  function selectProducts(files) {
+    const nextProducts = files.slice(0, 5);
+    const message = oversizedUploadMessage(nextProducts);
+    setError(message);
+    setProducts(message ? [] : nextProducts);
+  }
+
   return (
     <section className="panel create-panel">
       <div className="section-heading">
@@ -536,16 +557,16 @@ function GenerationForm({ projectId, presets, onCreated }) {
             <div className="upload-grid">
               <FileDrop
                 label="Imagem do modelo"
-                helper="PNG, JPG ou WebP"
+                helper="PNG, JPG ou WebP até 5 MB"
                 files={model ? [model] : []}
-                onChange={(event) => setModel(event.target.files?.[0] ?? null)}
+                onChange={(event) => selectModel(event.target.files?.[0])}
               />
               <FileDrop
                 label="Produtos"
-                helper="Até 5 imagens"
+                helper="Até 5 imagens de 5 MB"
                 files={products}
                 multiple
-                onChange={(event) => setProducts(Array.from(event.target.files ?? []).slice(0, 5))}
+                onChange={(event) => selectProducts(Array.from(event.target.files ?? []))}
               />
             </div>
           </section>
@@ -605,6 +626,13 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
     }
   }
 
+  function selectBanner(file) {
+    const nextBanner = file ?? null;
+    const message = nextBanner ? oversizedUploadMessage([nextBanner]) : "";
+    setError(message);
+    setBanner(message ? null : nextBanner);
+  }
+
   return (
     <section className="panel create-panel">
       <div className="section-heading">
@@ -620,9 +648,9 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
             <span className="step-label">01 · Peça original</span>
             <FileDrop
               label="Banner pronto"
-              helper="PNG, JPG ou WebP com texto, foto e layout final"
+              helper="PNG, JPG ou WebP até 5 MB"
               files={banner ? [banner] : []}
-              onChange={(event) => setBanner(event.target.files?.[0] ?? null)}
+              onChange={(event) => selectBanner(event.target.files?.[0])}
             />
           </section>
 

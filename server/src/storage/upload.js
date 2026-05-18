@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { uploadsDir } from "./paths.js";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+export const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export const upload = multer({
   storage: multer.diskStorage({
@@ -14,7 +15,7 @@ export const upload = multer({
     }
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: MAX_UPLOAD_FILE_SIZE_BYTES,
     files: 6
   },
   fileFilter: (req, file, cb) => {
