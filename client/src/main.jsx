@@ -699,6 +699,9 @@ function GenerationDetail({ data, presets, onRefresh }) {
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [busyResultId, setBusyResultId] = useState("");
+  const [regenerateTarget, setRegenerateTarget] = useState(null);
+  const [regenerateInstructions, setRegenerateInstructions] = useState("");
+  const [regenerateError, setRegenerateError] = useState("");
   const { generation, results, jobs } = data;
   const baseResult = results.find((result) => result.kind === "base");
   const unfoldResults = results.filter((result) => result.kind === "unfold");
@@ -733,11 +736,22 @@ function GenerationDetail({ data, presets, onRefresh }) {
     }
   }
 
-  async function regenerateUnfold(result) {
+  function openRegenerateModal(result) {
+    setRegenerateTarget(result);
+    setRegenerateInstructions("");
+    setRegenerateError("");
+  }
+
+  async function regenerateUnfold(result, extraInstructions = "") {
     setBusyResultId(result.id);
+    setRegenerateError("");
     try {
-      await api.regenerateResult(generation.id, result.id);
+      await api.regenerateResult(generation.id, result.id, { extraInstructions });
+      setRegenerateTarget(null);
+      setRegenerateInstructions("");
       await onRefresh();
+    } catch (err) {
+      setRegenerateError(err.message);
     } finally {
       setBusyResultId("");
     }
@@ -827,13 +841,68 @@ function GenerationDetail({ data, presets, onRefresh }) {
               key={result.id}
               result={result}
               busy={busyResultId === result.id}
-              onRegenerate={() => regenerateUnfold(result)}
+              onRegenerate={() => openRegenerateModal(result)}
               onDelete={() => deleteUnfold(result)}
             />
           ))}
         </div>
       )}
+
+      {regenerateTarget && (
+        <RegenerateUnfoldModal
+          result={regenerateTarget}
+          instructions={regenerateInstructions}
+          setInstructions={setRegenerateInstructions}
+          error={regenerateError}
+          loading={busyResultId === regenerateTarget.id}
+          onClose={() => {
+            if (busyResultId === regenerateTarget.id) return;
+            setRegenerateTarget(null);
+            setRegenerateError("");
+          }}
+          onSubmit={() => regenerateUnfold(regenerateTarget, regenerateInstructions)}
+        />
+      )}
     </section>
+  );
+}
+
+function RegenerateUnfoldModal({ result, instructions, setInstructions, error, loading, onClose, onSubmit }) {
+  const title = result.presetName ?? "Desdobramento";
+  const dimensions = result.asset.width && result.asset.height ? `${result.asset.width}x${result.asset.height}` : "original";
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="regenerate-title">
+        <div className="modal-heading">
+          <div>
+            <h3 id="regenerate-title">Regenerar banner</h3>
+            <p>{title} · {dimensions}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={loading} aria-label="Fechar">×</button>
+        </div>
+        <label>
+          Instruções para esta regeneração
+          <textarea
+            value={instructions}
+            maxLength={1500}
+            onChange={(event) => setInstructions(event.target.value)}
+            placeholder="Ex: manter o fundo, aproximar o produto, deixar a chamada maior, remover elementos da direita..."
+          />
+        </label>
+        <small className="field-hint">{instructions.length}/1500 caracteres</small>
+        {error && <p className="error">{error}</p>}
+        <div className="modal-actions">
+          <button className="ghost-button" type="button" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button className="primary-button" type="button" onClick={onSubmit} disabled={loading}>
+            {loading ? <Loader2 className="spin" size={18} /> : <RefreshCcw size={18} />}
+            Regenerar
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 

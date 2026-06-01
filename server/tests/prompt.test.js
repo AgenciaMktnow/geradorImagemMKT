@@ -69,6 +69,20 @@ describe("prompt builders", () => {
     expect(prompt).toContain("no graphic design overlays");
   });
 
+  it("adds extra regeneration instructions to a single unfold prompt", () => {
+    const prompt = buildUnfoldPrompt("base brief", {
+      name: "Banner teste",
+      slug: "banner-teste",
+      width: 1600,
+      height: 900,
+      channel: "custom"
+    }, "aproximar o produto e remover mãos distorcidas");
+
+    expect(prompt).toContain("Additional regeneration instructions from the user");
+    expect(prompt).toContain("aproximar o produto");
+    expect(prompt).toContain("remover referencia distorcidas");
+  });
+
   it("adds safe area guidance for Instagram campaign stories", () => {
     const prompt = buildUnfoldPrompt("base brief", {
       name: "Story Instagram Campanha",

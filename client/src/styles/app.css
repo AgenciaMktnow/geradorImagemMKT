@@ -816,6 +816,51 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.modal-panel {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.modal-heading h3,
+.modal-heading p {
+  margin: 0;
+}
+
+.modal-heading p,
+.field-hint {
+  color: #64748b;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .unfold-box {
   margin-top: 20px;
   border-top: 1px solid #e2e8f0;
@@ -1227,6 +1272,21 @@ button:disabled {
   color: #fca5a5;
   border-color: rgba(248, 113, 113, 0.28);
   background: rgba(127, 29, 29, 0.16);
+}
+
+.app-shell .modal-backdrop {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.app-shell .modal-panel {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: 0 26px 82px rgba(0, 0, 0, 0.48);
+}
+
+.app-shell .modal-heading p,
+.app-shell .field-hint {
+  color: var(--text-muted);
 }
 
 .app-shell .segmented,

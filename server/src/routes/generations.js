@@ -23,6 +23,9 @@ const promptSchema = z.object({
 const unfoldSchema = z.object({
   presetIds: z.array(z.string().uuid()).min(1)
 });
+const regenerateUnfoldSchema = z.object({
+  extraInstructions: z.string().trim().max(1500).optional().default("")
+});
 
 function assetUrl(row) {
   if (!row?.asset_id) return null;
@@ -325,6 +328,7 @@ router.post("/:id/regenerate-base", asyncHandler(async (req, res) => {
 }));
 
 router.post("/:id/results/:resultId/regenerate", asyncHandler(async (req, res) => {
+  const body = regenerateUnfoldSchema.parse(req.body ?? {});
   const result = await query(
     `SELECT gr.*, g.user_id, g.status AS generation_status
      FROM generation_results gr
@@ -354,7 +358,8 @@ router.post("/:id/results/:resultId/regenerate", asyncHandler(async (req, res) =
     userId: req.user.id,
     generationId: req.params.id,
     presetId: result.rows[0].preset_id,
-    replaceResult: true
+    replaceResult: true,
+    extraInstructions: body.extraInstructions
   });
   res.status(201).json({ job });
 }));

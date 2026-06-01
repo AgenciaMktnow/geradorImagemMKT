@@ -34,32 +34,35 @@ function sanitizePromptText(value = "") {
     .trim();
 }
 
-export function buildUnfoldPrompt(basePrompt, preset) {
-  if (basePrompt?.includes("BANNER_UNFOLD_MODE")) return buildBannerUnfoldPrompt(basePrompt, preset);
+export function buildUnfoldPrompt(basePrompt, preset, extraInstructions = "") {
+  const regenerationInstructions = sanitizePromptText(extraInstructions);
+  if (basePrompt?.includes("BANNER_UNFOLD_MODE")) return buildBannerUnfoldPrompt(basePrompt, preset, regenerationInstructions);
 
   return [
     `Recompose the generated campaign image for ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
     safeAreaInstruction(preset),
+    regenerationInstructions ? `Additional regeneration instructions from the user: ${regenerationInstructions}.` : "",
     "Preserve product visibility, natural proportions, lighting, and useful negative space for marketing layout.",
     "Leave clean negative space where a designer can later add copy in Photoshop or another design tool.",
     noTextInstruction(),
     `Original brief: ${basePrompt}`
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
-function buildBannerUnfoldPrompt(basePrompt, preset) {
+function buildBannerUnfoldPrompt(basePrompt, preset, regenerationInstructions = "") {
   return [
     `Adapt the provided finished banner into ${preset.name}.`,
     `Target size: ${preset.width}x${preset.height}.`,
     `Channel: ${preset.channel}.`,
     safeAreaInstruction(preset),
+    regenerationInstructions ? `Additional regeneration instructions from the user: ${regenerationInstructions}.` : "",
     "Preserve the original campaign content, product/photo, text, typography hierarchy, logo, call-to-action, visual style, colors, and brand layout as much as possible.",
     "Recompose and resize the layout intelligently for the target aspect ratio without inventing unrelated content.",
     "Keep all existing text from the uploaded banner legible when possible. Do not add new slogans, new prices, new URLs, or new placeholder text.",
     `Original brief: ${basePrompt}`
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 function safeAreaInstruction(preset) {

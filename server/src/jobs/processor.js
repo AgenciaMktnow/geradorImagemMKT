@@ -15,12 +15,12 @@ export async function enqueueBaseGeneration({ userId, generationId, replaceResul
   return result.rows[0];
 }
 
-export async function enqueueUnfoldGeneration({ userId, generationId, presetId, replaceResult = false }) {
+export async function enqueueUnfoldGeneration({ userId, generationId, presetId, replaceResult = false, extraInstructions = "" }) {
   const result = await query(
     `INSERT INTO jobs (user_id, generation_id, type, preset_id, payload)
      VALUES ($1, $2, 'unfold_generation', $3, $4)
      RETURNING *`,
-    [userId, generationId, presetId, { replaceResult }]
+    [userId, generationId, presetId, { replaceResult, extraInstructions }]
   );
   return result.rows[0];
 }
@@ -151,7 +151,7 @@ async function processUnfoldJob(job) {
   if (!baseResult.rowCount) throw new Error("Base image must be completed before unfolding");
 
   const preset = presetResult.rows[0];
-  const prompt = buildUnfoldPrompt(baseResult.rows[0].base_prompt, preset);
+  const prompt = buildUnfoldPrompt(baseResult.rows[0].base_prompt, preset, job.payload?.extraInstructions);
   const image = await provider.generateUnfold({ prompt, baseAsset: baseResult.rows[0], preset });
   const asset = await insertGeneratedAsset({
     userId: generation.user_id,

@@ -42,9 +42,9 @@ export const api = {
     body: JSON.stringify({ presetIds })
   }),
   regenerateBase: (id) => request(`/generations/${id}/regenerate-base`, { method: "POST", body: JSON.stringify({}) }),
-  regenerateResult: (generationId, resultId) => request(`/generations/${generationId}/results/${resultId}/regenerate`, {
+  regenerateResult: (generationId, resultId, payload = {}) => request(`/generations/${generationId}/results/${resultId}/regenerate`, {
     method: "POST",
-    body: JSON.stringify({})
+    body: JSON.stringify(payload)
   }),
   deleteResult: (generationId, resultId) => request(`/generations/${generationId}/results/${resultId}`, { method: "DELETE" }),
   retryJob: (id) => request(`/jobs/${id}/retry`, { method: "POST", body: JSON.stringify({}) })
