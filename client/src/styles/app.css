@@ -828,6 +828,8 @@ button:disabled {
 
 .modal-panel {
   width: min(560px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
   display: grid;
   gap: 16px;
   padding: 18px;

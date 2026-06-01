@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
   Download,
@@ -133,6 +134,8 @@ function Studio({ user, onLogout }) {
   const [toolMode, setToolMode] = useState("model");
   const [error, setError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("studio_theme") ?? "dark");
+  const resultsPanelRef = useRef(null);
+  const shouldScrollToResults = useRef(false);
 
   useEffect(() => {
     localStorage.setItem("studio_theme", theme);
@@ -158,6 +161,18 @@ function Studio({ user, onLogout }) {
     if (!selectedProjectId) return;
     api.listGenerations(selectedProjectId).then((data) => setGenerations(data.generations)).catch((err) => setError(err.message));
   }, [selectedProjectId]);
+
+  function scrollResultsIntoView() {
+    requestAnimationFrame(() => {
+      resultsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  useEffect(() => {
+    if (!selectedGeneration || !shouldScrollToResults.current) return;
+    shouldScrollToResults.current = false;
+    scrollResultsIntoView();
+  }, [selectedGeneration]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -193,6 +208,7 @@ function Studio({ user, onLogout }) {
   }
 
   async function onCreated(generation) {
+    shouldScrollToResults.current = true;
     setSelectedGenerationId(generation.id);
     setSelectedGeneration(await api.getGeneration(generation.id));
     const data = await api.listGenerations(selectedProjectId);
@@ -276,11 +292,14 @@ function Studio({ user, onLogout }) {
             />
           )}
           {selectedGeneration && (
-            <GenerationDetail
-              data={selectedGeneration}
-              presets={presets}
-              onRefresh={() => openGeneration(selectedGeneration.generation.id)}
-            />
+            <div ref={resultsPanelRef}>
+              <GenerationDetail
+                data={selectedGeneration}
+                presets={presets}
+                onRefresh={() => openGeneration(selectedGeneration.generation.id)}
+                onNavigateToResults={scrollResultsIntoView}
+              />
+            </div>
           )}
         </section>
       </section>
@@ -694,7 +713,7 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
   );
 }
 
-function GenerationDetail({ data, presets, onRefresh }) {
+function GenerationDetail({ data, presets, onRefresh, onNavigateToResults }) {
   const [selectedPresetIds, setSelectedPresetIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -721,6 +740,7 @@ function GenerationDetail({ data, presets, onRefresh }) {
       await api.unfoldGeneration(generation.id, selectedPresetIds);
       setSelectedPresetIds([]);
       await onRefresh();
+      onNavigateToResults?.();
     } finally {
       setLoading(false);
     }
@@ -868,14 +888,21 @@ function GenerationDetail({ data, presets, onRefresh }) {
 }
 
 function RegenerateUnfoldModal({ result, instructions, setInstructions, error, loading, onClose, onSubmit }) {
+  const panelRef = useRef(null);
   const title = result.presetName ?? "Desdobramento";
   const dimensions = result.asset.width && result.asset.height ? `${result.asset.width}x${result.asset.height}` : "original";
 
-  return (
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
+
+  const modal = (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="regenerate-title">
+      <section ref={panelRef} className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="regenerate-title">
         <div className="modal-heading">
           <div>
             <h3 id="regenerate-title">Regenerar banner</h3>
@@ -904,6 +931,8 @@ function RegenerateUnfoldModal({ result, instructions, setInstructions, error, l
       </section>
     </div>
   );
+
+  return createPortal(modal, document.querySelector(".app-shell") ?? document.body);
 }
 
 function ProcessingOverlay() {
