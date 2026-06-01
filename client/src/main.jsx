@@ -371,15 +371,22 @@ function CustomPresetForm({ onCreated }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(event) {
-    event.preventDefault();
+  async function submit() {
+    const name = preset.name.trim();
+    const width = Number(preset.width);
+    const height = Number(preset.height);
+
     setError("");
+    if (name.length < 2) return setError("Informe um nome com pelo menos 2 caracteres.");
+    if (!Number.isInteger(width) || width < 128 || width > 8192) return setError("A largura deve ficar entre 128 e 8192 px.");
+    if (!Number.isInteger(height) || height < 128 || height > 8192) return setError("A altura deve ficar entre 128 e 8192 px.");
+
     setLoading(true);
     try {
       await api.createPreset({
-        name: preset.name,
-        width: Number(preset.width),
-        height: Number(preset.height),
+        name,
+        width,
+        height,
         channel: "custom"
       });
       setPreset({ name: "", width: "", height: "" });
@@ -391,14 +398,20 @@ function CustomPresetForm({ onCreated }) {
     }
   }
 
+  function submitOnEnter(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    submit();
+  }
+
   return (
-    <form className="custom-preset-form" onSubmit={submit}>
-      <label>Nome<input required value={preset.name} onChange={(event) => setPreset({ ...preset, name: event.target.value })} placeholder="Ex: Banner marketplace" /></label>
-      <label>Largura<input required type="number" min="128" max="8192" value={preset.width} onChange={(event) => setPreset({ ...preset, width: event.target.value })} placeholder="1600" /></label>
-      <label>Altura<input required type="number" min="128" max="8192" value={preset.height} onChange={(event) => setPreset({ ...preset, height: event.target.value })} placeholder="900" /></label>
-      <button className="ghost-button" disabled={loading}>{loading ? <Loader2 className="spin" size={16} /> : <ImagePlus size={16} />} Adicionar</button>
+    <div className="custom-preset-form" onKeyDown={submitOnEnter}>
+      <label>Nome<input value={preset.name} onChange={(event) => setPreset({ ...preset, name: event.target.value })} placeholder="Ex: Banner marketplace" /></label>
+      <label>Largura<input type="number" min="128" max="8192" value={preset.width} onChange={(event) => setPreset({ ...preset, width: event.target.value })} placeholder="1600" /></label>
+      <label>Altura<input type="number" min="128" max="8192" value={preset.height} onChange={(event) => setPreset({ ...preset, height: event.target.value })} placeholder="900" /></label>
+      <button className="ghost-button" type="button" disabled={loading} onClick={submit}>{loading ? <Loader2 className="spin" size={16} /> : <ImagePlus size={16} />} Adicionar</button>
       {error && <p className="error">{error}</p>}
-    </form>
+    </div>
   );
 }
 
