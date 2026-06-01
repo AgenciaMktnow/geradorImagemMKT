@@ -220,6 +220,11 @@ function Studio({ user, onLogout }) {
     setPresets(data.presets);
   }
 
+  async function deletePreset(id) {
+    await api.deletePreset(id);
+    await refreshPresets();
+  }
+
   return (
     <main className="app-shell" data-theme={theme}>
       <header className="topbar">
@@ -289,6 +294,7 @@ function Studio({ user, onLogout }) {
               presets={presets}
               onCreated={onCreated}
               onPresetCreated={refreshPresets}
+              onPresetDeleted={deletePreset}
             />
           )}
           {selectedGeneration && (
@@ -298,6 +304,7 @@ function Studio({ user, onLogout }) {
                 presets={presets}
                 onRefresh={() => openGeneration(selectedGeneration.generation.id)}
                 onNavigateToResults={scrollResultsIntoView}
+                onPresetDeleted={deletePreset}
               />
             </div>
           )}
@@ -307,7 +314,7 @@ function Studio({ user, onLogout }) {
   );
 }
 
-function PresetSelector({ presets, selectedPresetIds, setSelectedPresetIds }) {
+function PresetSelector({ presets, selectedPresetIds, setSelectedPresetIds, onDeletePreset }) {
   const groupedPresets = presets.reduce((groups, preset) => {
     const key = preset.is_custom ? "Custom" : preset.channel;
     groups[key] = groups[key] ?? [];
@@ -322,19 +329,40 @@ function PresetSelector({ presets, selectedPresetIds, setSelectedPresetIds }) {
           <h4>{group}</h4>
           <div className="preset-grid">
             {groupPresets.map((preset) => (
-              <label className="preset-chip" key={preset.id}>
-                <input
-                  type="checkbox"
-                  checked={selectedPresetIds.includes(preset.id)}
-                  onChange={(event) => {
-                    setSelectedPresetIds((current) => event.target.checked
-                      ? [...current, preset.id]
-                      : current.filter((id) => id !== preset.id));
-                  }}
-                />
-                <span>{preset.name}</span>
-                <small>{preset.width}x{preset.height}{preset.is_custom ? " custom" : ""}</small>
-              </label>
+              <div className="preset-chip" key={preset.id}>
+                <label className="preset-choice">
+                  <input
+                    type="checkbox"
+                    checked={selectedPresetIds.includes(preset.id)}
+                    onChange={(event) => {
+                      setSelectedPresetIds((current) => event.target.checked
+                        ? [...current, preset.id]
+                        : current.filter((id) => id !== preset.id));
+                    }}
+                  />
+                  <span>{preset.name}</span>
+                  <small>{preset.width}x{preset.height}{preset.is_custom ? " custom" : ""}</small>
+                </label>
+                {preset.is_custom && onDeletePreset && (
+                  <button
+                    className="preset-delete"
+                    type="button"
+                    title="Excluir tamanho personalizado"
+                    aria-label={`Excluir ${preset.name}`}
+                    onClick={async () => {
+                      if (!window.confirm(`Excluir o tamanho personalizado "${preset.name}"?`)) return;
+                      try {
+                        await onDeletePreset(preset.id);
+                        setSelectedPresetIds((current) => current.filter((id) => id !== preset.id));
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </section>
@@ -625,7 +653,7 @@ function GenerationForm({ projectId, presets, onCreated }) {
   );
 }
 
-function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
+function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated, onPresetDeleted }) {
   const [banner, setBanner] = useState(null);
   const [selectedPresetIds, setSelectedPresetIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -694,7 +722,12 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
                 <p>Escolha formatos existentes ou adicione um tamanho próprio.</p>
               </div>
             </div>
-            <PresetSelector presets={presets} selectedPresetIds={selectedPresetIds} setSelectedPresetIds={setSelectedPresetIds} />
+            <PresetSelector
+              presets={presets}
+              selectedPresetIds={selectedPresetIds}
+              setSelectedPresetIds={setSelectedPresetIds}
+              onDeletePreset={onPresetDeleted}
+            />
 
             <div className="custom-preset-box">
               <h3>Adicionar desdobramento</h3>
@@ -713,7 +746,7 @@ function BannerUnfoldForm({ projectId, presets, onCreated, onPresetCreated }) {
   );
 }
 
-function GenerationDetail({ data, presets, onRefresh, onNavigateToResults }) {
+function GenerationDetail({ data, presets, onRefresh, onNavigateToResults, onPresetDeleted }) {
   const [selectedPresetIds, setSelectedPresetIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -851,7 +884,12 @@ function GenerationDetail({ data, presets, onRefresh, onNavigateToResults }) {
               Desdobrar
             </button>
           </div>
-          <PresetSelector presets={availablePresets} selectedPresetIds={selectedPresetIds} setSelectedPresetIds={setSelectedPresetIds} />
+          <PresetSelector
+            presets={availablePresets}
+            selectedPresetIds={selectedPresetIds}
+            setSelectedPresetIds={setSelectedPresetIds}
+            onDeletePreset={onPresetDeleted}
+          />
         </div>
       )}
 

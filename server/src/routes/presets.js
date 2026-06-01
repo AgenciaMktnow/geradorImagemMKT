@@ -15,7 +15,8 @@ const presetSchema = z.object({
 router.get("/", requireAuth, asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT * FROM dimension_presets
-     WHERE user_id IS NULL OR user_id = $1
+     WHERE (user_id IS NULL OR user_id = $1)
+       AND deleted_at IS NULL
      ORDER BY is_custom, channel, width, height`,
     [req.user.id]
   );
@@ -38,6 +39,31 @@ router.post("/", requireAuth, asyncHandler(async (req, res) => {
     [req.user.id, `${slug}-${Date.now()}`, body.name, body.width, body.height, body.channel]
   );
   res.status(201).json({ preset: result.rows[0] });
+}));
+
+router.delete("/:id", requireAuth, asyncHandler(async (req, res) => {
+  const preset = await query(
+    `SELECT * FROM dimension_presets
+     WHERE id = $1 AND user_id = $2 AND is_custom = true AND deleted_at IS NULL`,
+    [req.params.id, req.user.id]
+  );
+  if (!preset.rowCount) return res.status(404).json({ error: "Custom preset not found" });
+
+  const activeJob = await query(
+    `SELECT id FROM jobs
+     WHERE preset_id = $1 AND user_id = $2 AND status IN ('pending', 'processing')
+     LIMIT 1`,
+    [req.params.id, req.user.id]
+  );
+  if (activeJob.rowCount) {
+    return res.status(409).json({ error: "Cannot delete a preset while it is being processed" });
+  }
+
+  await query(
+    "UPDATE dimension_presets SET deleted_at = now() WHERE id = $1 AND user_id = $2",
+    [req.params.id, req.user.id]
+  );
+  res.status(204).send();
 }));
 
 export default router;

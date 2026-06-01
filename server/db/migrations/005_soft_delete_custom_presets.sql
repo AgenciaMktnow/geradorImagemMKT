@@ -1,0 +1,2 @@
+ALTER TABLE dimension_presets
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;

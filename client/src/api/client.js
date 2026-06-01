@@ -32,6 +32,7 @@ export const api = {
   createProject: (payload) => request("/projects", { method: "POST", body: JSON.stringify(payload) }),
   listPresets: () => request("/presets"),
   createPreset: (payload) => request("/presets", { method: "POST", body: JSON.stringify(payload) }),
+  deletePreset: (id) => request(`/presets/${id}`, { method: "DELETE" }),
   listGenerations: (projectId) => request(`/generations${projectId ? `?projectId=${projectId}` : ""}`),
   getGeneration: (id) => request(`/generations/${id}`),
   createGeneration: (formData) => request("/generations", { method: "POST", body: formData }),
