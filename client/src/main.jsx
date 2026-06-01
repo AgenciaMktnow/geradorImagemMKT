@@ -770,6 +770,7 @@ function GenerationDetail({ data, presets, onRefresh, onNavigateToResults }) {
       setRegenerateTarget(null);
       setRegenerateInstructions("");
       await onRefresh();
+      onNavigateToResults?.();
     } catch (err) {
       setRegenerateError(err.message);
     } finally {
